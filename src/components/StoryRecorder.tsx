@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Video, X, Check, RotateCcw, RefreshCw, ArrowLeft } from "lucide-react";
+import { Video, X, Check, RotateCcw, RefreshCw, ArrowLeft, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 interface StoryRecorderProps {
@@ -17,6 +17,7 @@ export const StoryRecorder = ({ onRecordingComplete, onCancel, onNavigateBack }:
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [facingMode, setFacingMode] = useState<"user" | "environment">("environment");
   const [cameraReady, setCameraReady] = useState(false);
+  const [isSending, setIsSending] = useState(false);
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -225,11 +226,20 @@ export const StoryRecorder = ({ onRecordingComplete, onCancel, onNavigateBack }:
   };
 
   const handleConfirm = async () => {
-    if (!recordedVideo) return;
+    if (!recordedVideo || isSending) return;
 
-    const response = await fetch(recordedVideo);
-    const blob = await response.blob();
-    onRecordingComplete(blob, recordingTime);
+    setIsSending(true);
+    
+    try {
+      const response = await fetch(recordedVideo);
+      const blob = await response.blob();
+      await onRecordingComplete(blob, recordingTime);
+    } catch (error) {
+      console.error('Erro ao enviar vídeo:', error);
+      toast.error('Erro ao enviar o vídeo. Tente novamente.');
+    } finally {
+      setIsSending(false);
+    }
   };
 
   const handleRetry = () => {
@@ -255,13 +265,26 @@ export const StoryRecorder = ({ onRecordingComplete, onCancel, onNavigateBack }:
 
       <div className="relative aspect-[9/16] max-h-[80vh]">
         {recordedVideo ? (
-          <video
-            src={recordedVideo}
-            className="w-full h-full object-cover"
-            controls
-            autoPlay
-            loop
-          />
+          <>
+            <video
+              src={recordedVideo}
+              className="w-full h-full object-cover"
+              controls
+              autoPlay
+              loop
+            />
+            {isSending && (
+              <div className="absolute inset-0 bg-black/80 flex items-center justify-center z-10">
+                <div className="text-center text-white">
+                  <Loader2 className="w-12 h-12 mx-auto mb-4 animate-spin" />
+                  <p className="text-lg font-medium">Enviando vídeo...</p>
+                  <p className="text-sm opacity-75 mt-1">
+                    Processando e fazendo upload
+                  </p>
+                </div>
+              </div>
+            )}
+          </>
         ) : (
           <>
             <video
@@ -315,9 +338,10 @@ export const StoryRecorder = ({ onRecordingComplete, onCancel, onNavigateBack }:
               <div className="flex flex-col items-center gap-2">
                 <Button
                   onClick={handleRetry}
+                  disabled={isSending}
                   size="lg"
                   variant="outline"
-                  className="rounded-full w-14 h-14 p-0 border-2 border-white bg-black/70 text-white hover:bg-black/90 hover:border-gray-300 shadow-lg backdrop-blur-sm"
+                  className="rounded-full w-14 h-14 p-0 border-2 border-white bg-black/70 text-white hover:bg-black/90 hover:border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg backdrop-blur-sm"
                   title="Tentar novamente"
                 >
                   <RotateCcw className="w-6 h-6" />
@@ -329,22 +353,28 @@ export const StoryRecorder = ({ onRecordingComplete, onCancel, onNavigateBack }:
               <div className="flex flex-col items-center gap-2">
                 <Button
                   onClick={handleConfirm}
+                  disabled={isSending}
                   size="lg"
-                  className="rounded-full w-16 h-16 p-0 bg-green-500 hover:bg-green-600 text-white shadow-lg"
-                  title="Confirmar e enviar"
+                  className="rounded-full w-16 h-16 p-0 bg-green-500 hover:bg-green-600 disabled:bg-green-400 disabled:cursor-not-allowed text-white shadow-lg"
+                  title={isSending ? "Enviando..." : "Confirmar e enviar"}
                 >
-                  <Check className="w-8 h-8" />
+                  {isSending ? (
+                    <Loader2 className="w-8 h-8 animate-spin" />
+                  ) : (
+                    <Check className="w-8 h-8" />
+                  )}
                 </Button>
                 <span className="text-white text-xs font-medium bg-green-500/80 px-2 py-1 rounded-full">
-                  Enviar
+                  {isSending ? 'Enviando...' : 'Enviar'}
                 </span>
               </div>
               <div className="flex flex-col items-center gap-2">
                 <Button
                   onClick={onCancel}
+                  disabled={isSending}
                   size="lg"
                   variant="outline"
-                  className="rounded-full w-14 h-14 p-0 border-2 border-white bg-red-500/80 text-white hover:bg-red-600 hover:border-gray-300 shadow-lg backdrop-blur-sm"
+                  className="rounded-full w-14 h-14 p-0 border-2 border-white bg-red-500/80 text-white hover:bg-red-600 hover:border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg backdrop-blur-sm"
                   title="Cancelar"
                 >
                   <X className="w-6 h-6" />
