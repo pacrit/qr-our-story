@@ -22,16 +22,8 @@ const Admin = () => {
   const checkUser = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
-      const { data: roles } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', user.id)
-        .eq('role', 'admin')
-        .single();
-
-      if (roles) {
-        navigate('/admin/dashboard');
-      }
+      // No sistema simples, se está autenticado, é admin
+      navigate('/admin/dashboard');
     }
   };
 
@@ -41,28 +33,47 @@ const Admin = () => {
 
     try {
       if (isSignUp) {
+        // Primeiro verificar se já existe usuário no sistema
+        try {
+          const { data: userCount, error: countError } = await supabase.rpc('count_users');
+          
+          if (countError) {
+            console.error('Erro ao verificar usuários existentes:', countError);
+            // Continuar mesmo com erro, deixar o backend decidir
+          } else if (userCount && userCount > 0) {
+            throw new Error('Este sistema permite apenas uma conta. Já existe um usuário cadastrado.');
+          }
+        } catch (countError) {
+          console.error('Erro na verificação de usuários:', countError);
+          // Continuar tentando registrar
+        }
+
+        // Tentar criar novo usuário
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
-          options: {
-            emailRedirectTo: `${window.location.origin}/admin/dashboard`
-          }
         });
 
-        if (error) throw error;
+        if (error) {
+          // Mensagens de erro específicas
+          if (error.code === 'user_already_exists') {
+            throw new Error("Usuário já existe! Use o botão 'Já tem conta? Faça login' para entrar.");
+          }
+          throw error;
+        }
 
         if (data.user) {
-          // Add admin role
-          const { error: roleError } = await supabase
-            .from('user_roles')
-            .insert({ user_id: data.user.id, role: 'admin' });
-
-          if (roleError) throw roleError;
-
-          toast.success('Conta criada! Redirecionando...');
-          navigate('/admin/dashboard');
+          // Verificar se o usuário foi confirmado automaticamente
+          if (data.user.email_confirmed_at) {
+            toast.success('Conta criada com sucesso! Você tem acesso total ao sistema.');
+            navigate('/admin/dashboard');
+          } else {
+            toast.success('Conta criada! Verifique seu email para confirmar a conta antes de fazer login.');
+            setIsSignUp(false); // Mudar para modo login
+          }
         }
       } else {
+        // Login
         const { data, error } = await supabase.auth.signInWithPassword({
           email,
           password,
@@ -71,24 +82,12 @@ const Admin = () => {
         if (error) throw error;
 
         if (data.user) {
-          const { data: roles } = await supabase
-            .from('user_roles')
-            .select('role')
-            .eq('user_id', data.user.id)
-            .eq('role', 'admin')
-            .single();
-
-          if (!roles) {
-            await supabase.auth.signOut();
-            toast.error('Acesso não autorizado');
-            return;
-          }
-
           toast.success('Login realizado!');
           navigate('/admin/dashboard');
         }
       }
     } catch (error: any) {
+      console.error('Erro na autenticação:', error);
       toast.error(error.message || 'Erro na autenticação');
     } finally {
       setLoading(false);
