@@ -39,16 +39,19 @@ const Admin = () => {
           
           if (countError) {
             console.error('Erro ao verificar usuários existentes:', countError);
-            // Continuar mesmo com erro, deixar o backend decidir
-          } else if (userCount && userCount > 0) {
-            throw new Error('Este sistema permite apenas uma conta. Já existe um usuário cadastrado.');
+            throw new Error('Erro ao verificar sistema. Tente novamente.');
           }
-        } catch (countError) {
+          
+          if (userCount && userCount > 0) {
+            throw new Error('Este sistema permite apenas uma conta de administrador. Já existe um usuário cadastrado. Use "Já tem conta? Faça login" se você é o proprietário.');
+          }
+        } catch (countError: any) {
           console.error('Erro na verificação de usuários:', countError);
-          // Continuar tentando registrar
+          // Se houve erro na verificação OU já existe usuário, não continuar
+          throw countError;
         }
 
-        // Tentar criar novo usuário
+        // Se chegou até aqui, pode tentar criar o usuário
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
@@ -63,14 +66,8 @@ const Admin = () => {
         }
 
         if (data.user) {
-          // Verificar se o usuário foi confirmado automaticamente
-          if (data.user.email_confirmed_at) {
-            toast.success('Conta criada com sucesso! Você tem acesso total ao sistema.');
-            navigate('/admin/dashboard');
-          } else {
-            toast.success('Conta criada! Verifique seu email para confirmar a conta antes de fazer login.');
-            setIsSignUp(false); // Mudar para modo login
-          }
+          toast.success('Conta de administrador criada com sucesso! Você tem acesso total ao sistema.');
+          navigate('/admin/dashboard');
         }
       } else {
         // Login
