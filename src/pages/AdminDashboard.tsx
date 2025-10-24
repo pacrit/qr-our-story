@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { cloudinaryService } from "@/services/cloudinary";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
@@ -20,6 +21,12 @@ interface Photo {
   id: string;
   storage_path: string;
   uploaded_at: string;
+  media_type: 'photo' | 'video';
+  duration?: number;
+  cloudinary_url?: string;
+  file_size?: number;
+  width?: number;
+  height?: number;
 }
 
 const AdminDashboard = () => {
@@ -54,7 +61,7 @@ const AdminDashboard = () => {
       console.error('Error fetching photos:', error);
       toast.error('Erro ao carregar fotos');
     } else {
-      setPhotos(data || []);
+      setPhotos((data || []) as Photo[]);
     }
     setLoading(false);
   };
@@ -92,11 +99,66 @@ const AdminDashboard = () => {
     navigate('/admin');
   };
 
-  const getPhotoUrl = (path: string) => {
+  // Funções copiadas do PhotoGallery para garantir consistência
+  const getMediaUrl = (photo: Photo) => {
+    // Se tiver URL do Cloudinary, usar ela
+    if (photo.cloudinary_url) {
+      return photo.cloudinary_url;
+    }
+    
+    // Se tiver public_id do Cloudinary, gerar URL otimizada
+    if (photo.storage_path && !photo.storage_path.includes('.')) {
+      if (photo.media_type === 'video') {
+        return cloudinaryService.generateVideoUrl(photo.storage_path, {
+          quality: 'auto',
+          format: 'mp4'
+        });
+      } else {
+        return cloudinaryService.generateUrl(photo.storage_path, {
+          quality: 'auto',
+          format: 'auto'
+        });
+      }
+    }
+    
+    // Fallback para URLs antigas do Supabase
     const { data } = supabase.storage
       .from('wedding-photos')
-      .getPublicUrl(path);
+      .getPublicUrl(photo.storage_path);
     return data.publicUrl;
+  };
+
+  const getThumbnailUrl = (photo: Photo) => {
+    // Se tiver URL do Cloudinary ou public_id, criar thumbnail otimizado
+    if (photo.cloudinary_url || (!photo.storage_path.includes('.'))) {
+      const publicId = photo.storage_path;
+      if (photo.media_type === 'video') {
+        return cloudinaryService.generateVideoUrl(publicId, {
+          width: 400,
+          height: 400,
+          quality: 'auto',
+          format: 'jpg' // Thumbnail do vídeo como imagem
+        });
+      } else {
+        return cloudinaryService.generateUrl(publicId, {
+          width: 400,
+          height: 400,
+          crop: 'fill',
+          quality: 'auto',
+          format: 'auto'
+        });
+      }
+    }
+    
+    // Fallback para URLs antigas do Supabase
+    return getMediaUrl(photo);
+  };
+
+  const formatDuration = (seconds?: number) => {
+    if (!seconds) return '';
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return mins > 0 ? `${mins}:${secs.toString().padStart(2, '0')}` : `${secs}s`;
   };
 
   if (loading) {
@@ -161,11 +223,30 @@ const AdminDashboard = () => {
             {photos.map((photo) => (
               <Card key={photo.id} className="overflow-hidden shadow-soft group hover:shadow-lg transition-all duration-300">
                 <div className="aspect-square relative">
-                  <img
-                    src={getPhotoUrl(photo.storage_path)}
-                    alt="Foto do casamento"
-                    className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                  />
+                  {photo.media_type === 'video' ? (
+                    <>
+                      <video
+                        src={getMediaUrl(photo)}
+                        poster={getThumbnailUrl(photo)}
+                        className="w-full h-full object-cover"
+                        controls
+                        playsInline
+                        preload="metadata"
+                      />
+                      {photo.duration && (
+                        <div className="absolute top-2 left-2 bg-black/70 text-white px-2 py-1 rounded text-sm font-medium">
+                          {formatDuration(photo.duration)}
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <img
+                      src={getThumbnailUrl(photo)}
+                      alt="Foto do casamento"
+                      className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                      loading="lazy"
+                    />
+                  )}
                   
                   {/* Overlay para hover (desktop) e botão sempre visível no mobile */}
                   <div className="absolute inset-0 bg-black/50 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
