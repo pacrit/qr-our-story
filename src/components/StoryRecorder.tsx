@@ -390,7 +390,7 @@ export const StoryRecorder = ({ onRecordingComplete, onCancel }: StoryRecorderPr
           
           {!recordedVideo && !isRecording && (
             <p className="text-white text-center mt-4 text-sm">
-              Limite: 60 segundos
+              Limite: 20 segundos
             </p>
           )}
         </div>

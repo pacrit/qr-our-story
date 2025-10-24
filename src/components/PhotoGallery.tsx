@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { cloudinaryService } from "@/services/cloudinary";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -9,6 +10,10 @@ interface Photo {
   uploaded_at: string;
   media_type: 'photo' | 'video';
   duration?: number;
+  cloudinary_url?: string;
+  file_size?: number;
+  width?: number;
+  height?: number;
 }
 
 export const PhotoGallery = () => {
@@ -53,11 +58,58 @@ export const PhotoGallery = () => {
     setLoading(false);
   };
 
-  const getMediaUrl = (path: string) => {
+  const getMediaUrl = (photo: Photo) => {
+    // Se tiver URL do Cloudinary, usar ela
+    if (photo.cloudinary_url) {
+      return photo.cloudinary_url;
+    }
+    
+    // Se tiver public_id do Cloudinary, gerar URL otimizada
+    if (photo.storage_path && !photo.storage_path.includes('.')) {
+      if (photo.media_type === 'video') {
+        return cloudinaryService.generateVideoUrl(photo.storage_path, {
+          quality: 'auto',
+          format: 'mp4'
+        });
+      } else {
+        return cloudinaryService.generateUrl(photo.storage_path, {
+          quality: 'auto',
+          format: 'auto'
+        });
+      }
+    }
+    
+    // Fallback para URLs antigas do Supabase
     const { data } = supabase.storage
       .from('wedding-photos')
-      .getPublicUrl(path);
+      .getPublicUrl(photo.storage_path);
     return data.publicUrl;
+  };
+
+  const getThumbnailUrl = (photo: Photo) => {
+    // Se tiver URL do Cloudinary ou public_id, criar thumbnail otimizado
+    if (photo.cloudinary_url || (!photo.storage_path.includes('.'))) {
+      const publicId = photo.storage_path;
+      if (photo.media_type === 'video') {
+        return cloudinaryService.generateVideoUrl(publicId, {
+          width: 400,
+          height: 400,
+          quality: 'auto',
+          format: 'jpg' // Thumbnail do vídeo como imagem
+        });
+      } else {
+        return cloudinaryService.generateUrl(publicId, {
+          width: 400,
+          height: 400,
+          crop: 'fill',
+          quality: 'auto',
+          format: 'auto'
+        });
+      }
+    }
+    
+    // Fallback para URLs antigas do Supabase
+    return getMediaUrl(photo);
   };
 
   const formatDuration = (seconds?: number) => {
@@ -98,10 +150,12 @@ export const PhotoGallery = () => {
             {photo.media_type === 'video' ? (
               <>
                 <video
-                  src={getMediaUrl(photo.storage_path)}
+                  src={getMediaUrl(photo)}
+                  poster={getThumbnailUrl(photo)}
                   className="w-full h-full object-cover"
                   controls
                   playsInline
+                  preload="metadata"
                 />
                 {photo.duration && (
                   <div className="absolute top-2 right-2 bg-black/70 text-white px-2 py-1 rounded text-sm font-medium">
@@ -111,9 +165,11 @@ export const PhotoGallery = () => {
               </>
             ) : (
               <img
-                src={getMediaUrl(photo.storage_path)}
+                src={getThumbnailUrl(photo)}
                 alt="Foto do casamento"
                 className="w-full h-full object-cover transition-smooth group-hover:scale-105"
+                loading="lazy"
+                onClick={() => window.open(getMediaUrl(photo), '_blank')}
               />
             )}
           </div>

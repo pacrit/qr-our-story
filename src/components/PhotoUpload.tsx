@@ -1,5 +1,6 @@
 import { useState, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { cloudinaryService } from "@/services/cloudinary";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Camera, Upload, CheckCircle2, Video } from "lucide-react";
@@ -37,22 +38,28 @@ export const PhotoUpload = () => {
     setSuccess(false);
 
     try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${Math.random().toString(36).substring(2)}-${Date.now()}.${fileExt}`;
-      const filePath = fileName;
+      // Verificar se Cloudinary está configurado
+      if (!cloudinaryService.isConfigured()) {
+        throw new Error('Cloudinary não está configurado. Configure as variáveis de ambiente.');
+      }
 
-      const { error: uploadError } = await supabase.storage
-        .from('wedding-photos')
-        .upload(filePath, file);
+      // Upload para Cloudinary
+      const uploadResult = await cloudinaryService.uploadFile(file, {
+        folder: 'wedding-photos',
+        tags: ['wedding', type, 'qr-our-story']
+      });
 
-      if (uploadError) throw uploadError;
-
+      // Salvar metadados no Supabase
       const { error: dbError } = await supabase
         .from('photos')
         .insert({ 
-          storage_path: filePath,
+          storage_path: uploadResult.public_id, // Usar public_id do Cloudinary
           media_type: type,
-          duration: duration
+          duration: uploadResult.duration || duration,
+          cloudinary_url: uploadResult.secure_url,
+          file_size: uploadResult.bytes,
+          width: uploadResult.width,
+          height: uploadResult.height
         });
 
       if (dbError) throw dbError;
