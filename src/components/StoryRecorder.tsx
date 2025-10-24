@@ -1,15 +1,16 @@
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Video, X, Check, RotateCcw, RefreshCw } from "lucide-react";
+import { Video, X, Check, RotateCcw, RefreshCw, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 
 interface StoryRecorderProps {
   onRecordingComplete: (blob: Blob, duration: number) => void;
   onCancel: () => void;
+  onNavigateBack?: () => void;
 }
 
-export const StoryRecorder = ({ onRecordingComplete, onCancel }: StoryRecorderProps) => {
+export const StoryRecorder = ({ onRecordingComplete, onCancel, onNavigateBack }: StoryRecorderProps) => {
   const [isRecording, setIsRecording] = useState(false);
   const [recordedVideo, setRecordedVideo] = useState<string | null>(null);
   const [recordingTime, setRecordingTime] = useState(0);
@@ -239,6 +240,19 @@ export const StoryRecorder = ({ onRecordingComplete, onCancel }: StoryRecorderPr
 
   return (
     <Card className="relative overflow-hidden bg-black">
+      {/* Header com botão de voltar */}
+      <div className="absolute top-0 left-0 right-0 z-20 p-4 bg-gradient-to-b from-black/50 to-transparent">
+        <Button
+          onClick={onNavigateBack || onCancel}
+          size="sm"
+          variant="ghost"
+          className="text-white hover:bg-white/20"
+        >
+          <ArrowLeft className="w-4 h-4 mr-2" />
+          Voltar
+        </Button>
+      </div>
+
       <div className="relative aspect-[9/16] max-h-[80vh]">
         {recordedVideo ? (
           <video

@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { cloudinaryService } from "@/services/cloudinary";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Camera, Upload, CheckCircle2, Video } from "lucide-react";
+import { Camera, Upload, CheckCircle2, Video, Loader2, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import { StoryRecorder } from "./StoryRecorder";
 
@@ -55,7 +55,7 @@ export const PhotoUpload = () => {
         .insert({ 
           storage_path: uploadResult.public_id, // Usar public_id do Cloudinary
           media_type: type,
-          duration: uploadResult.duration || duration,
+          duration: duration ? Math.round(duration) : (uploadResult.duration ? Math.round(uploadResult.duration) : null),
           cloudinary_url: uploadResult.secure_url,
           file_size: uploadResult.bytes,
           width: uploadResult.width,
@@ -66,12 +66,6 @@ export const PhotoUpload = () => {
 
       setSuccess(true);
       toast.success(type === 'photo' ? 'Foto enviada com sucesso! 🎉' : 'Vídeo enviado com sucesso! 🎉');
-      
-      setTimeout(() => {
-        setPreview(null);
-        setSuccess(false);
-        setShowStoryRecorder(false);
-      }, 3000);
     } catch (error) {
       console.error('Error uploading media:', error);
       toast.error('Erro ao enviar. Tente novamente.');
@@ -90,6 +84,11 @@ export const PhotoUpload = () => {
       <StoryRecorder
         onRecordingComplete={handleStoryRecording}
         onCancel={() => setShowStoryRecorder(false)}
+        onNavigateBack={() => {
+          setShowStoryRecorder(false);
+          setPreview(null);
+          setSuccess(false);
+        }}
       />
     );
   }
@@ -112,6 +111,19 @@ export const PhotoUpload = () => {
                 controls
               />
             )}
+            {uploading && (
+              <div className="absolute inset-0 bg-black/80 flex items-center justify-center">
+                <div className="text-center text-white">
+                  <Loader2 className="w-12 h-12 mx-auto mb-4 animate-spin" />
+                  <p className="text-lg font-medium">
+                    {mediaType === 'photo' ? 'Enviando foto...' : 'Enviando vídeo...'}
+                  </p>
+                  <p className="text-sm opacity-75 mt-1">
+                    Isso pode levar alguns segundos
+                  </p>
+                </div>
+              </div>
+            )}
             {success && (
               <div className="absolute inset-0 bg-primary/90 flex items-center justify-center">
                 <div className="text-center text-primary-foreground">
@@ -119,6 +131,19 @@ export const PhotoUpload = () => {
                   <p className="text-xl font-semibold">
                     {mediaType === 'photo' ? 'Foto enviada!' : 'Vídeo enviado!'}
                   </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setPreview(null);
+                      setSuccess(false);
+                      setShowStoryRecorder(false);
+                    }}
+                    className="mt-4 bg-white/20 border-white/30 text-white hover:bg-white/30"
+                  >
+                    <ArrowLeft className="w-4 h-4 mr-2" />
+                    Voltar ao início
+                  </Button>
                 </div>
               </div>
             )}
@@ -147,8 +172,12 @@ export const PhotoUpload = () => {
             size="lg"
             className="gap-2"
           >
-            <Camera className="w-5 h-5" />
-            Tirar Foto
+            {uploading ? (
+              <Loader2 className="w-5 h-5 animate-spin" />
+            ) : (
+              <Camera className="w-5 h-5" />
+            )}
+            {uploading ? 'Enviando...' : 'Tirar Foto'}
           </Button>
 
           <Button
@@ -158,8 +187,12 @@ export const PhotoUpload = () => {
             variant="outline"
             className="gap-2"
           >
-            <Video className="w-5 h-5" />
-            Gravar Story
+            {uploading ? (
+              <Loader2 className="w-5 h-5 animate-spin" />
+            ) : (
+              <Video className="w-5 h-5" />
+            )}
+            {uploading ? 'Enviando...' : 'Gravar Story'}
           </Button>
 
           <input
@@ -182,8 +215,12 @@ export const PhotoUpload = () => {
             size="lg"
             className="gap-2"
           >
-            <Upload className="w-5 h-5" />
-            Escolher Arquivo
+            {uploading ? (
+              <Loader2 className="w-5 h-5 animate-spin" />
+            ) : (
+              <Upload className="w-5 h-5" />
+            )}
+            {uploading ? 'Enviando...' : 'Escolher Arquivo'}
           </Button>
         </div>
       </div>
