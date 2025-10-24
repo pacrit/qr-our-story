@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Video, X, Check, RotateCcw } from "lucide-react";
+import { Video, X, Check, RotateCcw, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 
 interface StoryRecorderProps {
@@ -14,6 +14,7 @@ export const StoryRecorder = ({ onRecordingComplete, onCancel }: StoryRecorderPr
   const [recordedVideo, setRecordedVideo] = useState<string | null>(null);
   const [recordingTime, setRecordingTime] = useState(0);
   const [stream, setStream] = useState<MediaStream | null>(null);
+  const [facingMode, setFacingMode] = useState<"user" | "environment">("environment");
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -27,10 +28,19 @@ export const StoryRecorder = ({ onRecordingComplete, onCancel }: StoryRecorderPr
     };
   }, []);
 
-  const startCamera = async () => {
+  const startCamera = async (mode: "user" | "environment" = facingMode) => {
     try {
+      // Parar stream anterior se existir
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+      }
+
       const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment", width: 1080, height: 1920 },
+        video: { 
+          facingMode: mode,
+          width: { ideal: 1080 },
+          height: { ideal: 1920 }
+        },
         audio: true
       });
       setStream(mediaStream);
@@ -39,8 +49,28 @@ export const StoryRecorder = ({ onRecordingComplete, onCancel }: StoryRecorderPr
       }
     } catch (error) {
       console.error('Error accessing camera:', error);
-      toast.error('Não foi possível acessar a câmera');
+      // Tentar sem especificar facingMode se falhar
+      try {
+        const mediaStream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+          audio: true
+        });
+        setStream(mediaStream);
+        if (videoRef.current) {
+          videoRef.current.srcObject = mediaStream;
+        }
+        toast.success('Câmera ativada');
+      } catch (fallbackError) {
+        console.error('Fallback camera error:', fallbackError);
+        toast.error('Não foi possível acessar a câmera. Verifique as permissões.');
+      }
     }
+  };
+
+  const toggleCamera = () => {
+    const newMode = facingMode === "user" ? "environment" : "user";
+    setFacingMode(newMode);
+    startCamera(newMode);
   };
 
   const stopCamera = () => {
@@ -136,15 +166,26 @@ export const StoryRecorder = ({ onRecordingComplete, onCancel }: StoryRecorderPr
           />
         )}
 
-        {/* Recording indicator */}
-        {isRecording && (
-          <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10">
-            <div className="bg-red-500 text-white px-4 py-2 rounded-full flex items-center gap-2 animate-pulse">
+        {/* Recording indicator and flip button */}
+        <div className="absolute top-4 left-0 right-0 z-10 px-4 flex justify-between items-start">
+          {isRecording ? (
+            <div className="bg-red-500 text-white px-4 py-2 rounded-full flex items-center gap-2 animate-pulse mx-auto">
               <div className="w-3 h-3 bg-white rounded-full" />
               <span className="font-semibold">{recordingTime}s</span>
             </div>
-          </div>
-        )}
+          ) : (
+            !recordedVideo && (
+              <Button
+                onClick={toggleCamera}
+                size="sm"
+                variant="outline"
+                className="rounded-full bg-black/50 border-white/30 text-white hover:bg-black/70 ml-auto"
+              >
+                <RefreshCw className="w-4 h-4" />
+              </Button>
+            )
+          )}
+        </div>
 
         {/* Controls overlay */}
         <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black/80 to-transparent">
