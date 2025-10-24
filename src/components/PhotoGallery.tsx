@@ -7,6 +7,8 @@ interface Photo {
   id: string;
   storage_path: string;
   uploaded_at: string;
+  media_type: 'photo' | 'video';
+  duration?: number;
 }
 
 export const PhotoGallery = () => {
@@ -46,16 +48,23 @@ export const PhotoGallery = () => {
     if (error) {
       console.error('Error fetching photos:', error);
     } else {
-      setPhotos(data || []);
+      setPhotos((data || []) as Photo[]);
     }
     setLoading(false);
   };
 
-  const getPhotoUrl = (path: string) => {
+  const getMediaUrl = (path: string) => {
     const { data } = supabase.storage
       .from('wedding-photos')
       .getPublicUrl(path);
     return data.publicUrl;
+  };
+
+  const formatDuration = (seconds?: number) => {
+    if (!seconds) return '';
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return mins > 0 ? `${mins}:${secs.toString().padStart(2, '0')}` : `${secs}s`;
   };
 
   if (loading) {
@@ -72,7 +81,7 @@ export const PhotoGallery = () => {
     return (
       <Card className="p-12 text-center shadow-soft">
         <p className="text-muted-foreground text-lg">
-          Ainda não há fotos. Seja o primeiro a compartilhar um momento especial!
+          Ainda não há fotos ou vídeos. Seja o primeiro a compartilhar um momento especial!
         </p>
       </Card>
     );
@@ -86,11 +95,27 @@ export const PhotoGallery = () => {
           className="overflow-hidden group shadow-soft hover:shadow-elegant transition-smooth"
         >
           <div className="aspect-square relative">
-            <img
-              src={getPhotoUrl(photo.storage_path)}
-              alt="Foto do casamento"
-              className="w-full h-full object-cover transition-smooth group-hover:scale-105"
-            />
+            {photo.media_type === 'video' ? (
+              <>
+                <video
+                  src={getMediaUrl(photo.storage_path)}
+                  className="w-full h-full object-cover"
+                  controls
+                  playsInline
+                />
+                {photo.duration && (
+                  <div className="absolute top-2 right-2 bg-black/70 text-white px-2 py-1 rounded text-sm font-medium">
+                    {formatDuration(photo.duration)}
+                  </div>
+                )}
+              </>
+            ) : (
+              <img
+                src={getMediaUrl(photo.storage_path)}
+                alt="Foto do casamento"
+                className="w-full h-full object-cover transition-smooth group-hover:scale-105"
+              />
+            )}
           </div>
         </Card>
       ))}

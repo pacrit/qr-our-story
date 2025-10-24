@@ -17,19 +17,25 @@ export type Database = {
       photos: {
         Row: {
           created_at: string | null
+          duration: number | null
           id: string
+          media_type: string
           storage_path: string
           uploaded_at: string | null
         }
         Insert: {
           created_at?: string | null
+          duration?: number | null
           id?: string
+          media_type?: string
           storage_path: string
           uploaded_at?: string | null
         }
         Update: {
           created_at?: string | null
+          duration?: number | null
           id?: string
+          media_type?: string
           storage_path?: string
           uploaded_at?: string | null
         }
